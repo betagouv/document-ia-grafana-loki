@@ -1,0 +1,5 @@
+dashboard/
+.env
+
+## MAcos
+.DS_Store

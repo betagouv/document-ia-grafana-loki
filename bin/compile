@@ -1,0 +1,75 @@
+#!/bin/bash
+# usage: bin/compile <build-dir> <cache-dir> <env-dir>
+
+set -eo pipefail
+
+echo "Start building grafana-loki"
+
+BUILD_DIR=${1:-}
+CACHE_DIR=${2:-}
+ENV_DIR=${3:-}
+buildpack="$(cd -P "$(dirname "$0")" && pwd)"
+
+if [ -n "$BUILDPACK_DEBUG" ]; then
+  set -x
+fi
+
+KEYCLOAK_PATH="$BUILD_DIR/grafana"
+TMP_PATH="$BUILD_DIR/tmp"
+mkdir -p "${BUILD_DIR}/bin" "${CACHE_DIR}/dist" "${TMP_PATH}"
+export PATH="$BUILD_DIR/bin:$PATH"
+
+STACK="${STACK:-scalingo-24}"
+
+
+
+GRAFANA_VERSION=${GRAFANA_VERSION:-12.3.1}
+LOKI_VERSION=${LOKI_VERSION:-3.6.3}
+CADDY_VERSION=${CADDY_VERSION:-2.10.2}
+
+# If the env file exists, source it to get overrides
+if [ -f "$ENV_DIR/GRAFANA_VERSION" ]; then
+  GRAFANA_VERSION=$(cat "$ENV_DIR/GRAFANA_VERSION")
+fi
+if [ -f "$ENV_DIR/LOKI_VERSION" ]; then
+  LOKI_VERSION=$(cat "$ENV_DIR/LOKI_VERSION")
+fi
+if [ -f "$ENV_DIR/CADDY_VERSION" ]; then
+  CADDY_VERSION=$(cat "$ENV_DIR/CADDY_VERSION")
+fi
+
+echo "Installing Grafana v$GRAFANA_VERSION"
+GRAFANA_URL="https://dl.grafana.com/oss/release/grafana-${GRAFANA_VERSION}.linux-amd64.tar.gz"
+curl -L --retry 3 --silent --show-error --fail "$GRAFANA_URL" -o /tmp/grafana.tar.gz
+mkdir -p "$BUILD_DIR/grafana"
+tar -xzf /tmp/grafana.tar.gz -C "$BUILD_DIR/grafana" --strip-components=1
+rm /tmp/grafana.tar.gz
+
+echo "Installing Loki v$LOKI_VERSION"
+LOKI_URL="https://github.com/grafana/loki/releases/download/v${LOKI_VERSION}/loki-linux-amd64.zip"
+curl -L --retry 3 --silent --show-error --fail "$LOKI_URL" -o /tmp/loki.zip
+mkdir -p "$BUILD_DIR/bin"
+unzip -q /tmp/loki.zip -d "$BUILD_DIR/bin"
+mv "$BUILD_DIR/bin/loki-linux-amd64" "$BUILD_DIR/bin/loki"
+chmod +x "$BUILD_DIR/bin/loki"
+rm /tmp/loki.zip
+
+echo "Installing Caddy v$CADDY_VERSION"
+CADDY_URL="https://github.com/caddyserver/caddy/releases/download/v${CADDY_VERSION}/caddy_${CADDY_VERSION}_linux_amd64.tar.gz"
+curl -L --retry 3 --silent --show-error --fail "$CADDY_URL" -o /tmp/caddy.tar.gz
+tar -xzf /tmp/caddy.tar.gz -C "$BUILD_DIR/bin" caddy
+chmod +x "$BUILD_DIR/bin/caddy"
+rm /tmp/caddy.tar.gz
+
+# Ensure bin is in PATH
+mkdir -p "$BUILD_DIR/bin" "$BUILD_DIR/conf"
+cp "$buildpack/run" "$BUILD_DIR/bin/run"
+cp -r "$(dirname "$buildpack")/conf/"* "$BUILD_DIR/conf/"
+cp -r "$(dirname "$buildpack")/conf/provisioning" "$BUILD_DIR/grafana/conf/"
+ln -s "../grafana/bin/grafana" "$BUILD_DIR/bin/grafana"
+ln -s "../grafana/bin/grafana-cli" "$BUILD_DIR/bin/grafana-cli"
+ln -s "../grafana/bin/grafana-server" "$BUILD_DIR/bin/grafana-server"
+
+echo "Grafana installed successfully"
+
+

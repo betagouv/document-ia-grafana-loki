@@ -1,0 +1,77 @@
+#!/bin/bash
+
+# Wrapper script to configure Grafana environment based on Scalingo env vars
+
+set -e
+
+echo "Starting Grafana and Loki stack..."
+
+
+# Map Scalingo PORT to Grafana HTTP Port
+export PATH="/app/bin:$PATH"
+export GF_SERVER_HTTP_PORT="3001"
+export GF_SERVER_HTTP_ADDR="0.0.0.0"
+
+# Redirect Grafana write paths to /tmp for read-only filesystem compatibility
+export GF_PATHS_DATA="/tmp/grafana/data"
+export GF_PATHS_LOGS="/tmp/grafana/logs"
+export GF_PATHS_PLUGINS="/tmp/grafana/plugins"
+export GF_PATHS_PROVISIONING="/app/grafana/conf/provisioning"
+
+# Force logging to console so we can see startup errors in Scalingo logs
+export GF_LOG_MODE="console"
+export GF_LOG_LEVEL="debug"
+
+
+# Ensure temp directories exist
+mkdir -p "$GF_PATHS_DATA" "$GF_PATHS_LOGS" "$GF_PATHS_PLUGINS"
+
+# Handle Postgres addon configuration
+if [ -n "$SCALINGO_POSTGRESQL_URL" ]; then
+    echo "Configuring Grafana to use Scalingo PostgreSQL addon..."
+    export GF_DATABASE_TYPE="postgres"
+    # lib/pq does not support sslmode=prefer, so we switch to disable (or require if needed)
+    export GF_DATABASE_URL="${SCALINGO_POSTGRESQL_URL//sslmode=prefer/sslmode=disable}"
+fi
+
+if [ $# -eq 0 ]; then
+    echo "Starting Loki..."
+    loki -config.file=/app/conf/loki-config.yaml -config.expand-env=true & LOKI_PID=$!
+    
+    echo "Starting Grafana with explicit config..."
+    # Force configuration via CLI args to ensure they take precedence
+    grafana server \
+      --homepath /app/grafana \
+      --config /app/grafana/conf/defaults.ini \
+      cfg:server.http_addr=127.0.0.1 \
+      cfg:server.http_port=3001 \
+      cfg:log.mode=console \
+      cfg:log.level=debug \
+      cfg:paths.data=/tmp/grafana/data \
+      cfg:paths.logs=/tmp/grafana/logs \
+      cfg:paths.plugins=/tmp/grafana/plugins \
+      & GRAFANA_PID=$!
+
+    echo "Starting Caddy on port $PORT..."
+    caddy run --config /app/conf/Caddyfile --adapter caddyfile & CADDY_PID=$!
+
+    # Graceful shutdown handler
+    term() {
+        echo "Caught signal, stopping services..."
+        kill -TERM "$LOKI_PID" "$GRAFANA_PID" "$CADDY_PID" 2>/dev/null || true
+        wait "$CADDY_PID"
+    }
+    trap term TERM INT
+
+    # Monitor loop
+    while kill -0 "$LOKI_PID" 2>/dev/null && kill -0 "$GRAFANA_PID" 2>/dev/null && kill -0 "$CADDY_PID" 2>/dev/null; do
+        sleep 1
+    done
+
+    echo "One of the processes exited unexpected via signal or crash. Stopping the rest..."
+    kill -TERM "$LOKI_PID" "$GRAFANA_PID" "$CADDY_PID" 2>/dev/null || true
+    wait
+    exit 1
+else
+    exec "$@"
+fi

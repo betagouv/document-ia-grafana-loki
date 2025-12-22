@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+# Always accept the Grafana buildpack
+echo "Grafana"
+exit 0

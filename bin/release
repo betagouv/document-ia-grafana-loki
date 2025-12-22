@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# usage: bin/release <build-dir>
+
+# We need to bind to the PORT environment variable provided by Scalingo.
+# Grafana can be configured via command line arguments or config file.
+# Using CLI args is often simpler for dynamic ports.
+# However, Grafana 11+ might strictly validate args.
+# Let's try to use the config override via CLI.
+
+# Note: $HOMEPATH is usually available at runtime in the dyno.
+
+cat <<EOF
+---
+default_process_types:
+  web: bin/run
+EOF

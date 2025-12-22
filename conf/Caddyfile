@@ -1,0 +1,12 @@
+:{$PORT} {
+  # Route Loki (on ne strippe PAS /loki)
+  @loki path /loki/*
+  handle @loki {
+    reverse_proxy 127.0.0.1:3100
+  }
+
+  # Tout le reste → Grafana (catch-all en dernier)
+  handle {
+    reverse_proxy 127.0.0.1:3001
+  }
+}
