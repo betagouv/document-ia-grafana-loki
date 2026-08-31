@@ -1,11 +1,21 @@
 :{$PORT} {
-  # Route Loki (on ne strippe PAS /loki)
-  @loki path /loki/*
-  handle @loki {
+  # Ingest only: POST /loki/api/v1/push from Scalingo osc-secnum-fr1 egress, with bearer token.
+  # Grafana still queries Loki on 127.0.0.1:3100 (not through this public route).
+  @loki_push {
+    method POST
+    path /loki/api/v1/push
+    header_regexp X-Real-IP "^(148\\.253\\.96\\.190|148\\.253\\.97\\.14)$"
+    header Authorization "Bearer {$LOKI_PUSH_TOKEN}"
+  }
+  handle @loki_push {
     reverse_proxy 127.0.0.1:3100
   }
 
-  # Tout le reste → Grafana (catch-all en dernier)
+  @loki_blocked path /loki/*
+  handle @loki_blocked {
+    respond 403
+  }
+
   handle {
     reverse_proxy 127.0.0.1:3001
   }

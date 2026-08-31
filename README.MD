@@ -10,10 +10,10 @@ This buildpack installs and configures a complete observability stack on Scaling
 Since Scalingo applications run as a single container (per process type), we use a wrapper script (`bin/run`) to launch all three services in parallel within the same container.
 
 - **Caddy** listens on the public `$PORT` provided by Scalingo.
-    - Maps `/loki/*` to Loki (internal port 3100).
+    - Maps `POST /loki/api/v1/push` to Loki (internal port 3100), only when the request comes from Scalingo `osc-secnum-fr1` egress IPs **and** carries a valid bearer token. All other `/loki/*` paths return `403`.
     - Maps `/*` to Grafana (internal port 3001).
 - **Grafana** listens on `localhost:3001`.
-- **Loki** listens on `localhost:3100`.
+- **Loki** listens on `localhost:3100`. Grafana queries Loki locally, so dashboards are unaffected by the public `/loki` restrictions.
 
 ## Configuration
 
@@ -28,6 +28,25 @@ You must configure the following environment variables in your Scalingo applicat
 
 #### Database (Grafana)
 - **Scalingo PostgreSQL Addon**: Configuring the addon will automatically set `SCALINGO_POSTGRESQL_URL`. The buildpack detects this and configures Grafana to use it as its backend database.
+
+#### Authentication (Loki push)
+Public log ingestion is gated by Caddy (Loki itself has no auth). Both checks are required:
+
+- `LOKI_PUSH_TOKEN`: Shared secret. Clients must send `Authorization: Bearer <token>`. \
+  *Required. If unset, all public push requests are rejected.*
+- Source IP must be a Scalingo **osc-secnum-fr1** egress address (`148.253.96.190` or `148.253.97.14`), taken from the `X-Real-IP` header set by the Scalingo router. \
+  *These IPs are shared by all apps in the region and may change; see [Scalingo egress docs](https://doc.scalingo.com/platform/networking/public/egress).*
+
+Example:
+
+```bash
+curl -X POST "https://document-ia-grafana.osc-secnum-fr1.scalingo.io/loki/api/v1/push" \
+  -H "Authorization: Bearer $LOKI_PUSH_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data '{"streams":[{"stream":{"app":"example"},"values":[["0","hello"]]}]}'
+```
+
+Read APIs (`/loki/api/v1/query`, labels, tail, etc.) are not exposed publicly. Use Grafana to query logs.
 
 #### Loki Storage (S3 / Object Storage)
 Loki is configured to store logs in an S3-compatible object storage (e.g., Scalingo Object Storage, AWS S3, MinIO).
@@ -77,8 +96,10 @@ You can verify the entire stack locally using Docker Compose, which simulates th
     ```bash
     GF_SECURITY_ADMIN_USER=admin
     GF_SECURITY_ADMIN_PASSWORD=secret
+    LOKI_PUSH_TOKEN=changeme
     PORT=3000
     # Add your S3 credentials here if you want to test S3 locally
+    # Public /loki/api/v1/push also requires X-Real-IP set to a Scalingo osc-secnum-fr1 egress IP
     ```
 
 2.  Run the stack:
