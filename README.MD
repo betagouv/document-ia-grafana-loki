@@ -1,9 +1,9 @@
 # Grafana + Loki + Caddy Buildpack for Scalingo
 
 This buildpack installs and configures a complete observability stack on Scalingo, running:
-- **Grafana** (v12.3.1) - Visualization and Dashboarding
-- **Loki** (v3.6.3) - Log Aggregation System
-- **Caddy** (v2.10.2) - Reverse Proxy (Terminates SSL/HTTP and routes traffic)
+- **Grafana** (v13.1.4) - Visualization and Dashboarding
+- **Loki** (v3.7.7) - Log Aggregation System
+- **Caddy** (v2.11.4) - Reverse Proxy (Terminates SSL/HTTP and routes traffic)
 
 ## Architecture
 
