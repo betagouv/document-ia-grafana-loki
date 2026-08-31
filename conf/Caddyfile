@@ -1,22 +1,31 @@
+{
+	servers {
+		# Scalingo routers NAT onto private IPs and set X-Real-IP to the origin client.
+		trusted_proxies static private_ranges
+		client_ip_headers X-Real-IP X-Forwarded-For
+	}
+}
+
 :{$PORT} {
-  # Ingest only: POST /loki/api/v1/push from Scalingo osc-secnum-fr1 egress, with bearer token.
-  # Grafana still queries Loki on 127.0.0.1:3100 (not through this public route).
-  @loki_push {
-    method POST
-    path /loki/api/v1/push
-    header_regexp X-Real-IP "^(148\\.253\\.96\\.190|148\\.253\\.97\\.14)$"
-    header Authorization "Bearer {$LOKI_PUSH_TOKEN}"
-  }
-  handle @loki_push {
-    reverse_proxy 127.0.0.1:3100
-  }
+	# Ingest only: POST /loki/api/v1/push from allowed client IPs/CIDRs, with bearer token.
+	# Grafana still queries Loki on 127.0.0.1:3100 (not through this public route).
+	# LOKI_PUSH_ALLOWED_IPS: space-separated IPs or CIDR blocks (substituted before parse).
+	@loki_push {
+		method POST
+		path /loki/api/v1/push
+		client_ip {$LOKI_PUSH_ALLOWED_IPS}
+		header Authorization "Bearer {$LOKI_PUSH_TOKEN}"
+	}
+	handle @loki_push {
+		reverse_proxy 127.0.0.1:3100
+	}
 
-  @loki_blocked path /loki/*
-  handle @loki_blocked {
-    respond 403
-  }
+	@loki_blocked path /loki/*
+	handle @loki_blocked {
+		respond 403
+	}
 
-  handle {
-    reverse_proxy 127.0.0.1:3001
-  }
+	handle {
+		reverse_proxy 127.0.0.1:3001
+	}
 }

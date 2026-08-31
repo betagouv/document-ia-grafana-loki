@@ -13,6 +13,7 @@ services:
       - AWS_ACCESS_KEY_ID
       - AWS_SECRET_ACCESS_KEY
       - LOKI_PUSH_TOKEN
+      - LOKI_PUSH_ALLOWED_IPS
       - PORT
     depends_on:
       - db

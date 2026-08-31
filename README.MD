@@ -10,7 +10,7 @@ This buildpack installs and configures a complete observability stack on Scaling
 Since Scalingo applications run as a single container (per process type), we use a wrapper script (`bin/run`) to launch all three services in parallel within the same container.
 
 - **Caddy** listens on the public `$PORT` provided by Scalingo.
-    - Maps `POST /loki/api/v1/push` to Loki (internal port 3100), only when the request comes from Scalingo `osc-secnum-fr1` egress IPs **and** carries a valid bearer token. All other `/loki/*` paths return `403`.
+    - Maps `POST /loki/api/v1/push` to Loki (internal port 3100), only when the client IP matches `LOKI_PUSH_ALLOWED_IPS` **and** the request carries a valid bearer token. All other `/loki/*` paths return `403`.
     - Maps `/*` to Grafana (internal port 3001).
 - **Grafana** listens on `localhost:3001`.
 - **Loki** listens on `localhost:3100`. Grafana queries Loki locally, so dashboards are unaffected by the public `/loki` restrictions.
@@ -34,8 +34,8 @@ Public log ingestion is gated by Caddy (Loki itself has no auth). Both checks ar
 
 - `LOKI_PUSH_TOKEN`: Shared secret. Clients must send `Authorization: Bearer <token>`. \
   *Required. If unset, all public push requests are rejected.*
-- Source IP must be a Scalingo **osc-secnum-fr1** egress address (`148.253.96.190` or `148.253.97.14`), taken from the `X-Real-IP` header set by the Scalingo router. \
-  *These IPs are shared by all apps in the region and may change; see [Scalingo egress docs](https://doc.scalingo.com/platform/networking/public/egress).*
+- `LOKI_PUSH_ALLOWED_IPS`: Space-separated list of IPs or CIDR blocks allowed to push. Caddy reads the client IP from `X-Real-IP` (set by the Scalingo router). \
+  *Default: Scalingo `osc-secnum-fr1` [egress](https://doc.scalingo.com/platform/networking/public/egress)). These addresses are shared by all apps in the region and may change.*
 
 Example:
 
@@ -97,9 +97,10 @@ You can verify the entire stack locally using Docker Compose, which simulates th
     GF_SECURITY_ADMIN_USER=admin
     GF_SECURITY_ADMIN_PASSWORD=secret
     LOKI_PUSH_TOKEN=changeme
+    LOKI_PUSH_ALLOWED_IPS=127.0.0.1/8
     PORT=3000
     # Add your S3 credentials here if you want to test S3 locally
-    # Public /loki/api/v1/push also requires X-Real-IP set to a Scalingo osc-secnum-fr1 egress IP
+    # Public /loki/api/v1/push uses X-Real-IP (or the TCP peer if that header is absent)
     ```
 
 2.  Run the stack:
