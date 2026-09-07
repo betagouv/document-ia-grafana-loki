@@ -57,6 +57,28 @@ Loki is configured to store logs in an S3-compatible object storage (e.g., Scali
 - `AWS_ACCESS_KEY_ID`: Access Key ID.
 - `AWS_SECRET_ACCESS_KEY`: Secret Access Key.
 
+#### Alerting (Matrix Forwarder - Optional)
+You can forward Grafana alerts directly to Matrix/Tchap channels via [grafana-matrix-forwarder](https://gitlab.com/hctrdev/grafana-matrix-forwarder). The forwarder runs locally in the container on port `6000`.
+
+- `GMF_MATRIX_HOMESERVER`: The Matrix homeserver address (e.g. `matrix.org` or `matrix.agent.numerique.gouv.fr`). \
+  *Setting this variable enables downloading and running the forwarder.*
+- `GMF_MATRIX_USER`: The Matrix account username (e.g. `@bot:matrix.org`).
+- `GMF_MATRIX_PASSWORD`: The password for the Matrix account.
+- `GMF_VERSION`: Optional version override for the binary (default: `0.8.3`).
+
+> [!NOTE]
+> When adding `GMF_MATRIX_HOMESERVER` for the first time on Scalingo, trigger a **rebuild** (e.g. `scalingo rebuild` or manual deploy) so that the buildpack downloads the binary during the compile phase.
+
+##### Configuring Grafana Alerting (Webhook)
+1. In Grafana, navigate to **Alerting** > **Contact points**.
+2. Click **Add contact point** and select type **Webhook**.
+3. Set the **URL** to:
+   ```text
+   http://127.0.0.1:6000/api/v1/unified?roomId=<your_room_id>
+   ```
+   *(Replace `<your_room_id>` with your Matrix room ID, e.g. `!myRoomId:matrix.org`).*
+4. In **Notification policies**, direct the desired alerts to this contact point.
+
 ### Loki Configuration
 The Loki configuration (`conf/loki-config.yaml`) is set up to use **TSDB** as the index type and **S3** as the object store.
 

@@ -55,21 +55,48 @@ if [ $# -eq 0 ]; then
     echo "Starting Caddy on port $PORT..."
     caddy run --config /app/conf/Caddyfile --adapter caddyfile & CADDY_PID=$!
 
+    FORWARDER_PID=""
+    if [ -n "$GMF_MATRIX_HOMESERVER" ]; then
+        if command -v grafana-matrix-forwarder >/dev/null 2>&1; then
+            echo "Starting Grafana Matrix Forwarder..."
+            GMF_ARGS=(--homeserver "$GMF_MATRIX_HOMESERVER")
+            if [ -n "$GMF_MATRIX_USER" ]; then
+                GMF_ARGS+=(--user "$GMF_MATRIX_USER")
+            fi
+            if [ -n "$GMF_MATRIX_PASSWORD" ]; then
+                GMF_ARGS+=(--password "$GMF_MATRIX_PASSWORD")
+            fi
+            grafana-matrix-forwarder "${GMF_ARGS[@]}" & FORWARDER_PID=$!
+        else
+            echo "WARNING: GMF_MATRIX_HOMESERVER is set but grafana-matrix-forwarder binary is not installed. Please rebuild the application on Scalingo to download it."
+        fi
+    fi
+
     # Graceful shutdown handler
     term() {
         echo "Caught signal, stopping services..."
         kill -TERM "$LOKI_PID" "$GRAFANA_PID" "$CADDY_PID" 2>/dev/null || true
+        if [ -n "$FORWARDER_PID" ]; then
+            kill -TERM "$FORWARDER_PID" 2>/dev/null || true
+        fi
         wait "$CADDY_PID"
     }
     trap term TERM INT
 
     # Monitor loop
     while kill -0 "$LOKI_PID" 2>/dev/null && kill -0 "$GRAFANA_PID" 2>/dev/null && kill -0 "$CADDY_PID" 2>/dev/null; do
+        if [ -n "$FORWARDER_PID" ] && ! kill -0 "$FORWARDER_PID" 2>/dev/null; then
+            echo "Grafana Matrix Forwarder process exited unexpectedly. Stopping the rest..."
+            break
+        fi
         sleep 1
     done
 
     echo "One of the processes exited unexpected via signal or crash. Stopping the rest..."
     kill -TERM "$LOKI_PID" "$GRAFANA_PID" "$CADDY_PID" 2>/dev/null || true
+    if [ -n "$FORWARDER_PID" ]; then
+        kill -TERM "$FORWARDER_PID" 2>/dev/null || true
+    fi
     wait
     exit 1
 else

@@ -26,6 +26,8 @@ STACK="${STACK:-scalingo-24}"
 GRAFANA_VERSION=${GRAFANA_VERSION:-13.1.4}
 LOKI_VERSION=${LOKI_VERSION:-3.7.7}
 CADDY_VERSION=${CADDY_VERSION:-2.11.4}
+GMF_VERSION=${GMF_VERSION:-0.8.3}
+GMF_MATRIX_HOMESERVER=${GMF_MATRIX_HOMESERVER:-}
 
 # If the env file exists, source it to get overrides
 if [ -f "$ENV_DIR/GRAFANA_VERSION" ]; then
@@ -36,6 +38,12 @@ if [ -f "$ENV_DIR/LOKI_VERSION" ]; then
 fi
 if [ -f "$ENV_DIR/CADDY_VERSION" ]; then
   CADDY_VERSION=$(cat "$ENV_DIR/CADDY_VERSION")
+fi
+if [ -f "$ENV_DIR/GMF_VERSION" ]; then
+  GMF_VERSION=$(cat "$ENV_DIR/GMF_VERSION")
+fi
+if [ -f "$ENV_DIR/GMF_MATRIX_HOMESERVER" ]; then
+  GMF_MATRIX_HOMESERVER=$(cat "$ENV_DIR/GMF_MATRIX_HOMESERVER")
 fi
 
 echo "Installing Grafana v$GRAFANA_VERSION"
@@ -60,6 +68,15 @@ curl -L --retry 3 --silent --show-error --fail "$CADDY_URL" -o /tmp/caddy.tar.gz
 tar -xzf /tmp/caddy.tar.gz -C "$BUILD_DIR/bin" caddy
 chmod +x "$BUILD_DIR/bin/caddy"
 rm /tmp/caddy.tar.gz
+
+if [ -n "$GMF_MATRIX_HOMESERVER" ]; then
+  echo "Installing Grafana Matrix Forwarder v$GMF_VERSION"
+  GMF_URL="https://gitlab.com/hctrdev/grafana-matrix-forwarder/-/releases/v${GMF_VERSION}/downloads/grafana-matrix-forwarder_${GMF_VERSION}_linux_amd64.tar.gz"
+  curl -L --retry 3 --silent --show-error --fail "$GMF_URL" -o /tmp/gmf.tar.gz
+  tar -xzf /tmp/gmf.tar.gz -C "$BUILD_DIR/bin" grafana-matrix-forwarder
+  chmod +x "$BUILD_DIR/bin/grafana-matrix-forwarder"
+  rm /tmp/gmf.tar.gz
+fi
 
 # Ensure bin is in PATH
 mkdir -p "$BUILD_DIR/bin" "$BUILD_DIR/conf"
