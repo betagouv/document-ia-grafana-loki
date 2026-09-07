@@ -14,6 +14,9 @@ services:
       - AWS_SECRET_ACCESS_KEY
       - LOKI_PUSH_TOKEN
       - LOKI_PUSH_ALLOWED_IPS
+      - GMF_MATRIX_HOMESERVER
+      - GMF_MATRIX_USER
+      - GMF_MATRIX_PASSWORD
       - PORT
     depends_on:
       - db
