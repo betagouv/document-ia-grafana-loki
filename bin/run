@@ -20,7 +20,7 @@ export GF_PATHS_PROVISIONING="/app/grafana/conf/provisioning"
 
 # Force logging to console so we can see startup errors in Scalingo logs
 export GF_LOG_MODE="console"
-export GF_LOG_LEVEL="debug"
+export GF_LOG_LEVEL="info"
 
 
 # Ensure temp directories exist
@@ -46,7 +46,7 @@ if [ $# -eq 0 ]; then
       cfg:server.http_addr=127.0.0.1 \
       cfg:server.http_port=3001 \
       cfg:log.mode=console \
-      cfg:log.level=debug \
+      cfg:log.level=info \
       cfg:paths.data=/tmp/grafana/data \
       cfg:paths.logs=/tmp/grafana/logs \
       cfg:paths.plugins=/tmp/grafana/plugins \
