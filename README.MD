@@ -35,7 +35,7 @@ Public log ingestion is gated by Caddy (Loki itself has no auth). Both checks ar
 - `LOKI_PUSH_TOKEN`: Shared secret. Clients must send `Authorization: Bearer <token>`. \
   *Required. If unset, all public push requests are rejected.*
 - `LOKI_PUSH_ALLOWED_IPS`: Space-separated list of IPs or CIDR blocks allowed to push. Caddy reads the client IP from `X-Real-IP` (set by the Scalingo router). \
-  *Default: Scalingo `osc-secnum-fr1` [egress](https://doc.scalingo.com/platform/networking/public/egress)). These addresses are shared by all apps in the region and may change.*
+  *Note: Applications hosted in the same Scalingo region communicate internally via `10.0.0.0/8`. For external traffic or fallback, include Scalingo egress IPs (e.g. `10.0.0.0/8 148.253.96.190/32 148.253.97.14/32` for `osc-secnum-fr1`).*
 
 Example:
 

@@ -1,12 +1,13 @@
 {
 	servers {
-		# Scalingo routers NAT onto private IPs and set X-Real-IP to the origin client.
+		# Les routeurs Scalingo acheminent le trafic depuis des IP privées (10.0.0.0/8) et injectent le header X-Real-IP.
 		trusted_proxies static private_ranges
 		client_ip_headers X-Real-IP X-Forwarded-For
 	}
 }
 
 :{$PORT} {
+
 	# Ingest only: POST /loki/api/v1/push from allowed client IPs/CIDRs, with bearer token.
 	# Grafana still queries Loki on 127.0.0.1:3100 (not through this public route).
 	# LOKI_PUSH_ALLOWED_IPS: space-separated IPs or CIDR blocks (substituted before parse).
